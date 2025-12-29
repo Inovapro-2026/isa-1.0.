@@ -99,14 +99,21 @@ const Requests = () => {
 
     try {
       if (actionType === 'approve') {
+        // Validate required fields
+        if (!selectedRequest.matricula) {
+          toast.error('Matrícula não encontrada na solicitação');
+          setIsProcessing(false);
+          return;
+        }
+
         // Copy data to clients table
         const { error: insertError } = await supabase
           .from('clients')
           .insert({
-            matricula: selectedRequest.matricula || '',
+            matricula: selectedRequest.matricula,
             full_name: selectedRequest.full_name,
             email: selectedRequest.email,
-            cpf: selectedRequest.cpf || '',
+            cpf: selectedRequest.cpf || '00000000000', // Placeholder if not provided
             phone: selectedRequest.phone,
             company_name: selectedRequest.company_name,
             segmento: selectedRequest.segmento,
@@ -116,7 +123,10 @@ const Requests = () => {
             start_date: new Date().toISOString().split('T')[0],
           });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw insertError;
+        }
 
         // Delete from account_requests
         const { error: deleteError } = await supabase
