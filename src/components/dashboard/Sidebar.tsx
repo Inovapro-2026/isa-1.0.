@@ -35,6 +35,8 @@ const adminMenuItems = [
 const clientMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard/client" },
   { icon: Bot, label: "Meu WhatsApp", path: "/client/whatsapp" },
+  { icon: MessageSquare, label: "Memória de IA", path: "/client/memoria-ia" },
+  { icon: MessageSquare, label: "Chat", path: "/client/chat" },
   { icon: HeadphonesIcon, label: "Meu Suporte", path: "/client/support" },
   { icon: Settings, label: "Meu Perfil", path: "/client/profile" },
 ];
