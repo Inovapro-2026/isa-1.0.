@@ -227,8 +227,8 @@ const Login = () => {
       return;
     }
 
-    // Client login: requires password
-    if (validationStatus !== 'valid' || !password) return;
+    // Client login: also passwordless using CPF
+    if (validationStatus !== 'valid') return;
     
     setIsLoading(true);
 
@@ -237,21 +237,35 @@ const Login = () => {
       
       if (!email) {
         toast.error("Email não encontrado");
+        setIsLoading(false);
         return;
       }
 
+      // First, try to get the client's CPF from the clients table
+      const { data: clientRecord } = await supabase
+        .from('clients')
+        .select('cpf')
+        .eq('email', email)
+        .maybeSingle();
+
+      // Use CPF as password (remove formatting)
+      const cpfPassword = clientRecord?.cpf?.replace(/\D/g, '') || '00000000000';
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: cpfPassword,
       });
 
       if (error) {
-        toast.error("Senha incorreta. Tente novamente.");
+        console.error('Login error:', error);
+        toast.error("Erro ao entrar. Entre em contato com o suporte.");
+        setIsLoading(false);
         return;
       }
 
       toast.success("Login realizado com sucesso!");
     } catch (error) {
+      console.error('Login error:', error);
       toast.error("Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
@@ -454,30 +468,7 @@ const Login = () => {
               </div>
             )}
 
-            {/* Password Field - Only for clients */}
-            {loginType === "client" && validationStatus === 'valid' && (
-              <div className="space-y-2 mb-4 animate-scale-in">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  🔐 Senha
-                </label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="h-12 pr-10 transition-all duration-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Password Field - REMOVED: Now using CPF as automatic password */}
 
             {/* Login Button - Admin: no password needed */}
             {loginType === "admin" && validationStatus === 'valid' && (
@@ -502,14 +493,14 @@ const Login = () => {
               </Button>
             )}
 
-            {/* Login Button - Client: requires password */}
+            {/* Login Button - Client: no password needed anymore */}
             {loginType === "client" && validationStatus === 'valid' && (
               <Button 
                 onClick={handleLogin}
                 variant="hero" 
                 className="w-full h-14 text-lg transition-all duration-300 hover:scale-[1.02] animate-scale-in group" 
                 size="lg"
-                disabled={isLoading || !password}
+                disabled={isLoading}
               >
                 {isLoading ? (
                   <>
@@ -542,19 +533,7 @@ const Login = () => {
               </div>
             )}
 
-            {/* Recovery link - only for clients */}
-            {loginType === "client" && validationStatus === 'valid' && (
-              <div className="mt-4 text-center">
-                <button 
-                  onClick={handleResetPassword}
-                  disabled={isLoading}
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
-                >
-                  <Settings className="w-3 h-3" />
-                  Esqueceu sua senha? Recuperar
-                </button>
-              </div>
-            )}
+            {/* Recovery link removed - passwordless login */}
           </CardContent>
         </Card>
       </div>
