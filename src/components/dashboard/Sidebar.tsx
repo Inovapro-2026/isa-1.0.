@@ -15,6 +15,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -48,8 +50,19 @@ export function Sidebar({ isAdmin = true }: SidebarProps) {
   
   const menuItems = isAdmin ? adminMenuItems : clientMenuItems;
 
-  const handleLogout = () => {
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error("Erro ao sair: " + error.message);
+        return;
+      }
+      toast.success("Logout realizado com sucesso!");
+      navigate("/login");
+    } catch (error) {
+      toast.error("Erro ao sair");
+      navigate("/login");
+    }
   };
 
   return (
