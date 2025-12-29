@@ -194,12 +194,46 @@ const Login = () => {
   }, [loginType]);
 
   const handleLogin = async () => {
+    // Admin login: only matricula required (no password)
+    if (loginType === "admin") {
+      if (validationStatus !== 'valid') return;
+      
+      setIsLoading(true);
+      try {
+        const email = adminData?.email;
+        if (!email) {
+          toast.error("Email não encontrado");
+          return;
+        }
+
+        // Admin uses CPF as default password
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password: '10533219531', // Default admin password (CPF)
+        });
+
+        if (error) {
+          // If login fails, try password reset
+          toast.error("Erro ao entrar. Contate o suporte.");
+          return;
+        }
+
+        toast.success("Login realizado com sucesso!");
+      } catch (error) {
+        toast.error("Erro ao fazer login. Tente novamente.");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Client login: requires password
     if (validationStatus !== 'valid' || !password) return;
     
     setIsLoading(true);
 
     try {
-      const email = loginType === "admin" ? adminData?.email : clientData?.email;
+      const email = clientData?.email;
       
       if (!email) {
         toast.error("Email não encontrado");
@@ -420,8 +454,8 @@ const Login = () => {
               </div>
             )}
 
-            {/* Password Field */}
-            {validationStatus === 'valid' && (
+            {/* Password Field - Only for clients */}
+            {loginType === "client" && validationStatus === 'valid' && (
               <div className="space-y-2 mb-4 animate-scale-in">
                 <label className="text-sm font-medium flex items-center gap-2">
                   🔐 Senha
@@ -445,8 +479,31 @@ const Login = () => {
               </div>
             )}
 
-            {/* Login Button */}
-            {validationStatus === 'valid' && (
+            {/* Login Button - Admin: no password needed */}
+            {loginType === "admin" && validationStatus === 'valid' && (
+              <Button 
+                onClick={handleLogin}
+                variant="hero" 
+                className="w-full h-14 text-lg transition-all duration-300 hover:scale-[1.02] animate-scale-in group" 
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  <>
+                    ENTRAR
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+            )}
+
+            {/* Login Button - Client: requires password */}
+            {loginType === "client" && validationStatus === 'valid' && (
               <Button 
                 onClick={handleLogin}
                 variant="hero" 
@@ -485,8 +542,8 @@ const Login = () => {
               </div>
             )}
 
-            {/* Recovery link */}
-            {validationStatus === 'valid' && (
+            {/* Recovery link - only for clients */}
+            {loginType === "client" && validationStatus === 'valid' && (
               <div className="mt-4 text-center">
                 <button 
                   onClick={handleResetPassword}
