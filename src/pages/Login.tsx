@@ -56,54 +56,24 @@ const Login = () => {
         setValidationStatus('idle');
         
         try {
-          // First check if admin exists in profiles
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, full_name, email, avatar_url')
+          // Check in admins table ONLY
+          const { data: adminRecord } = await supabase
+            .from('admins')
+            .select('id, full_name, email, avatar_url, is_active')
             .eq('matricula', matricula)
             .maybeSingle();
 
-          if (profileData) {
-            // Check if user has admin role
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', profileData.id)
-              .maybeSingle();
-
-            if (roleData?.role === 'admin' || roleData?.role === 'super_admin') {
-              setValidationStatus('valid');
-              setAdminData({
-                full_name: profileData.full_name || 'Administrador',
-                email: profileData.email,
-                avatar_url: profileData.avatar_url,
-              });
-              return;
-            }
-          }
-
-          // Check in approved account_requests (admin login allowed even when logged out)
-          const { data: requestData } = await supabase
-            .from('account_requests')
-            .select('full_name, email, status')
-            .eq('matricula', matricula)
-            .eq('status', 'approved')
-            .maybeSingle();
-
-          if (requestData) {
-            // NOTE: unauthenticated users cannot read `profiles` due to RLS, so we validate via `account_requests`
+          if (adminRecord && adminRecord.is_active) {
             setValidationStatus('valid');
             setAdminData({
-              full_name: requestData.full_name,
-              email: requestData.email,
-              avatar_url: null,
-              needsRegistration: false,
+              full_name: adminRecord.full_name,
+              email: adminRecord.email,
+              avatar_url: adminRecord.avatar_url,
             });
-            return;
+          } else {
+            setValidationStatus('invalid');
+            setAdminData(null);
           }
-
-          setValidationStatus('invalid');
-          setAdminData(null);
         } catch (error) {
           setValidationStatus('invalid');
           setAdminData(null);
@@ -115,58 +85,67 @@ const Login = () => {
         setValidationStatus('idle');
         
         try {
-          // First check in profiles (registered users)
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('full_name, email')
+          // Check in clients table ONLY
+          const { data: clientRecord } = await supabase
+            .from('clients')
+            .select('id, full_name, email, status, is_active')
             .eq('matricula', matricula)
             .maybeSingle();
 
-          if (profileData) {
-            setValidationStatus('valid');
-            setClientData({
-              full_name: profileData.full_name || 'Cliente',
-              email: profileData.email,
-              status: 'approved',
-            });
-            return;
-          }
-
-          // Check in account_requests
-          const { data: requestData } = await supabase
-            .from('account_requests')
-            .select('full_name, email, status')
-            .eq('matricula', matricula)
-            .maybeSingle();
-
-          if (requestData) {
-            if (requestData.status === 'approved') {
-              // Approved but user might not yet have access to read profiles before login
+          if (clientRecord) {
+            if (clientRecord.is_active && clientRecord.status === 'active') {
               setValidationStatus('valid');
               setClientData({
-                full_name: requestData.full_name,
-                email: requestData.email,
+                full_name: clientRecord.full_name,
+                email: clientRecord.email,
                 status: 'approved',
-                needsRegistration: false,
               });
-            } else if (requestData.status === 'pending') {
+            } else if (clientRecord.status === 'pending') {
               setValidationStatus('pending');
               setClientData({
-                full_name: requestData.full_name,
-                email: requestData.email,
+                full_name: clientRecord.full_name,
+                email: clientRecord.email,
                 status: 'pending',
               });
             } else {
               setValidationStatus('invalid');
               setClientData({
-                full_name: requestData.full_name,
-                email: requestData.email,
+                full_name: clientRecord.full_name,
+                email: clientRecord.email,
                 status: 'rejected',
               });
             }
           } else {
-            setValidationStatus('invalid');
-            setClientData(null);
+            // Check in account_requests for pending registrations
+            const { data: requestData } = await supabase
+              .from('account_requests')
+              .select('full_name, email, status')
+              .eq('matricula', matricula)
+              .maybeSingle();
+
+            if (requestData) {
+              if (requestData.status === 'approved') {
+                setValidationStatus('valid');
+                setClientData({
+                  full_name: requestData.full_name,
+                  email: requestData.email,
+                  status: 'approved',
+                });
+              } else if (requestData.status === 'pending') {
+                setValidationStatus('pending');
+                setClientData({
+                  full_name: requestData.full_name,
+                  email: requestData.email,
+                  status: 'pending',
+                });
+              } else {
+                setValidationStatus('invalid');
+                setClientData(null);
+              }
+            } else {
+              setValidationStatus('invalid');
+              setClientData(null);
+            }
           }
         } catch (error) {
           setValidationStatus('invalid');
@@ -194,7 +173,7 @@ const Login = () => {
   }, [loginType]);
 
   const handleLogin = async () => {
-    // Admin login: only matricula required (no password)
+    // Admin login: validate against admins table
     if (loginType === "admin") {
       if (validationStatus !== 'valid') return;
       
@@ -206,14 +185,26 @@ const Login = () => {
           return;
         }
 
-        // Admin uses CPF as default password
+        // Get admin CPF from admins table
+        const { data: adminRecord } = await supabase
+          .from('admins')
+          .select('cpf')
+          .eq('email', email)
+          .maybeSingle();
+
+        const cpfPassword = adminRecord?.cpf?.replace(/\D/g, '') || '';
+
+        if (!cpfPassword) {
+          toast.error("CPF do administrador não encontrado");
+          return;
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
           email,
-          password: '10533219531', // Default admin password (CPF)
+          password: cpfPassword,
         });
 
         if (error) {
-          // If login fails, try password reset
           toast.error("Erro ao entrar. Contate o suporte.");
           return;
         }
@@ -227,7 +218,7 @@ const Login = () => {
       return;
     }
 
-    // Client login: also passwordless using CPF
+    // Client login: validate against clients table ONLY
     if (validationStatus !== 'valid') return;
     
     setIsLoading(true);
@@ -241,7 +232,7 @@ const Login = () => {
         return;
       }
 
-      // First, try to get the client's CPF from the clients table
+      // Get client's CPF from clients table
       const { data: clientRecord } = await supabase
         .from('clients')
         .select('cpf')
@@ -249,7 +240,13 @@ const Login = () => {
         .maybeSingle();
 
       // Use CPF as password (remove formatting)
-      const cpfPassword = clientRecord?.cpf?.replace(/\D/g, '') || '00000000000';
+      const cpfPassword = clientRecord?.cpf?.replace(/\D/g, '') || '';
+
+      if (!cpfPassword) {
+        toast.error("CPF do cliente não encontrado");
+        setIsLoading(false);
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -257,7 +254,6 @@ const Login = () => {
       });
 
       if (error) {
-        console.error('Login error:', error);
         toast.error("Erro ao entrar. Entre em contato com o suporte.");
         setIsLoading(false);
         return;
@@ -265,7 +261,6 @@ const Login = () => {
 
       toast.success("Login realizado com sucesso!");
     } catch (error) {
-      console.error('Login error:', error);
       toast.error("Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
