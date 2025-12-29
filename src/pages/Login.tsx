@@ -286,8 +286,8 @@ const Login = () => {
 
       // If user doesn't exist yet in Supabase Auth, create it on first login
       if (error?.message?.toLowerCase().includes('invalid login credentials')) {
-        const redirectUrl = `${window.location.origin}/login`;
-        const { error: signUpError } = await supabase.auth.signUp({
+        const redirectUrl = `${window.location.origin}/`;
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password: cpfPassword,
           options: {
@@ -298,16 +298,45 @@ const Login = () => {
           },
         });
 
-        if (signUpError && !signUpError.message?.toLowerCase().includes('already registered')) {
-          toast.error("Cliente não cadastrado no sistema de login. Contate o suporte.");
+        // Check if user was created but needs email confirmation
+        if (signUpData?.user && !signUpData.session) {
+          toast.info("Conta criada! Verifique seu email para confirmar o cadastro.");
           setIsLoading(false);
           return;
         }
 
-        ({ error } = await trySignIn());
+        // If signUp returned a session, user is logged in
+        if (signUpData?.session) {
+          toast.success("Conta criada e login realizado com sucesso!");
+          setIsLoading(false);
+          return;
+        }
+
+        if (signUpError) {
+          // Handle "already registered" - try login again
+          if (signUpError.message?.toLowerCase().includes('already registered')) {
+            ({ error } = await trySignIn());
+          } else {
+            console.error('SignUp error:', signUpError);
+            toast.error(`Erro ao criar conta: ${signUpError.message}`);
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          // No error, try login again
+          ({ error } = await trySignIn());
+        }
+      }
+
+      // Handle email not confirmed error
+      if (error?.message?.toLowerCase().includes('email not confirmed')) {
+        toast.info("Confirme seu email antes de entrar. Verifique sua caixa de entrada.");
+        setIsLoading(false);
+        return;
       }
 
       if (error) {
+        console.error('Login error:', error);
         toast.error("Erro ao entrar. Verifique seus dados ou contate o suporte.");
         setIsLoading(false);
         return;
@@ -315,6 +344,7 @@ const Login = () => {
 
       toast.success("Login realizado com sucesso!");
     } catch (error) {
+      console.error('Login error:', error);
       toast.error("Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
