@@ -208,23 +208,17 @@ const Login = () => {
 
         let { error } = await trySignIn();
 
-        // If user doesn't exist yet in Supabase Auth, create it on first login
+        // If user doesn't exist yet in Supabase Auth, provision it via Edge Function
         if (error?.message?.toLowerCase().includes('invalid login credentials')) {
-          const redirectUrl = `${window.location.origin}/login`;
-          const { error: signUpError } = await supabase.auth.signUp({
-            email,
-            password: cpfPassword,
-            options: {
-              emailRedirectTo: redirectUrl,
-              data: {
-                full_name: adminData?.full_name,
-              },
+          const { data, error: provisionError } = await supabase.functions.invoke('provision-user', {
+            body: {
+              loginType: 'admin',
+              matricula,
             },
           });
 
-          // ignore "already registered" and try login again
-          if (signUpError && !signUpError.message?.toLowerCase().includes('already registered')) {
-            toast.error("Administrador não cadastrado no sistema de login.");
+          if (provisionError || !data?.ok) {
+            toast.error("Administrador não cadastrado para acesso.");
             return;
           }
 
@@ -284,55 +278,22 @@ const Login = () => {
 
       let { error } = await trySignIn();
 
-      // If user doesn't exist yet in Supabase Auth, create it on first login
+      // If user doesn't exist yet in Supabase Auth, provision it via Edge Function
       if (error?.message?.toLowerCase().includes('invalid login credentials')) {
-        const redirectUrl = `${window.location.origin}/`;
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password: cpfPassword,
-          options: {
-            emailRedirectTo: redirectUrl,
-            data: {
-              full_name: clientData?.full_name,
-            },
+        const { data, error: provisionError } = await supabase.functions.invoke('provision-user', {
+          body: {
+            loginType: 'client',
+            matricula,
           },
         });
 
-        // Check if user was created but needs email confirmation
-        if (signUpData?.user && !signUpData.session) {
-          toast.info("Conta criada! Verifique seu email para confirmar o cadastro.");
+        if (provisionError || !data?.ok) {
+          toast.error("Conta ainda não liberada para login. Contate o suporte.");
           setIsLoading(false);
           return;
         }
 
-        // If signUp returned a session, user is logged in
-        if (signUpData?.session) {
-          toast.success("Conta criada e login realizado com sucesso!");
-          setIsLoading(false);
-          return;
-        }
-
-        if (signUpError) {
-          // Handle "already registered" - try login again
-          if (signUpError.message?.toLowerCase().includes('already registered')) {
-            ({ error } = await trySignIn());
-          } else {
-            console.error('SignUp error:', signUpError);
-            toast.error(`Erro ao criar conta: ${signUpError.message}`);
-            setIsLoading(false);
-            return;
-          }
-        } else {
-          // No error, try login again
-          ({ error } = await trySignIn());
-        }
-      }
-
-      // Handle email not confirmed error
-      if (error?.message?.toLowerCase().includes('email not confirmed')) {
-        toast.info("Confirme seu email antes de entrar. Verifique sua caixa de entrada.");
-        setIsLoading(false);
-        return;
+        ({ error } = await trySignIn());
       }
 
       if (error) {
