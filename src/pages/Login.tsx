@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bot, Shield, User, Loader2, ArrowRight, CheckCircle, XCircle, Clock, Settings } from "lucide-react";
+import { Bot, Shield, User, Loader2, ArrowRight, CheckCircle, XCircle, Clock, Settings, Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,20 +14,24 @@ interface AdminData {
   full_name: string;
   email: string;
   avatar_url: string | null;
+  needsRegistration?: boolean;
 }
 
 interface ClientData {
   full_name: string;
   status: 'pending' | 'approved' | 'rejected';
   email: string;
+  needsRegistration?: boolean;
 }
 
 const Login = () => {
   const [loginType, setLoginType] = useState<LoginType>("client");
   const [matricula, setMatricula] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [validationStatus, setValidationStatus] = useState<'idle' | 'valid' | 'invalid' | 'pending'>('idle');
+  const [validationStatus, setValidationStatus] = useState<'idle' | 'valid' | 'invalid' | 'pending' | 'needs_registration'>('idle');
   const [adminData, setAdminData] = useState<AdminData | null>(null);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const navigate = useNavigate();
@@ -52,37 +56,53 @@ const Login = () => {
         setValidationStatus('idle');
         
         try {
-          // Check if admin exists with this matricula
-          const { data: profileData, error } = await supabase
+          // First check if admin exists in profiles
+          const { data: profileData } = await supabase
             .from('profiles')
             .select('id, full_name, email, avatar_url')
             .eq('matricula', matricula)
             .maybeSingle();
 
-          if (error || !profileData) {
-            setValidationStatus('invalid');
-            setAdminData(null);
+          if (profileData) {
+            // Check if user has admin role
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', profileData.id)
+              .maybeSingle();
+
+            if (roleData?.role === 'admin' || roleData?.role === 'super_admin') {
+              setValidationStatus('valid');
+              setAdminData({
+                full_name: profileData.full_name || 'Administrador',
+                email: profileData.email,
+                avatar_url: profileData.avatar_url,
+              });
+              return;
+            }
+          }
+
+          // Check in approved account_requests (admin not yet registered)
+          const { data: requestData } = await supabase
+            .from('account_requests')
+            .select('full_name, email, status')
+            .eq('matricula', matricula)
+            .eq('status', 'approved')
+            .maybeSingle();
+
+          if (requestData) {
+            setValidationStatus('needs_registration');
+            setAdminData({
+              full_name: requestData.full_name,
+              email: requestData.email,
+              avatar_url: null,
+              needsRegistration: true,
+            });
             return;
           }
 
-          // Check if user has admin role
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', profileData.id)
-            .maybeSingle();
-
-          if (roleData?.role === 'admin' || roleData?.role === 'super_admin') {
-            setValidationStatus('valid');
-            setAdminData({
-              full_name: profileData.full_name || 'Administrador',
-              email: profileData.email,
-              avatar_url: profileData.avatar_url,
-            });
-          } else {
-            setValidationStatus('invalid');
-            setAdminData(null);
-          }
+          setValidationStatus('invalid');
+          setAdminData(null);
         } catch (error) {
           setValidationStatus('invalid');
           setAdminData(null);
@@ -94,7 +114,7 @@ const Login = () => {
         setValidationStatus('idle');
         
         try {
-          // First check in profiles (approved users)
+          // First check in profiles (registered users)
           const { data: profileData } = await supabase
             .from('profiles')
             .select('full_name, email')
@@ -111,7 +131,7 @@ const Login = () => {
             return;
           }
 
-          // Check in account_requests (pending/rejected)
+          // Check in account_requests
           const { data: requestData } = await supabase
             .from('account_requests')
             .select('full_name, email, status')
@@ -119,16 +139,29 @@ const Login = () => {
             .maybeSingle();
 
           if (requestData) {
-            if (requestData.status === 'pending') {
+            if (requestData.status === 'approved') {
+              setValidationStatus('needs_registration');
+              setClientData({
+                full_name: requestData.full_name,
+                email: requestData.email,
+                status: 'approved',
+                needsRegistration: true,
+              });
+            } else if (requestData.status === 'pending') {
               setValidationStatus('pending');
-            } else if (requestData.status === 'rejected') {
+              setClientData({
+                full_name: requestData.full_name,
+                email: requestData.email,
+                status: 'pending',
+              });
+            } else {
               setValidationStatus('invalid');
+              setClientData({
+                full_name: requestData.full_name,
+                email: requestData.email,
+                status: 'rejected',
+              });
             }
-            setClientData({
-              full_name: requestData.full_name,
-              email: requestData.email,
-              status: requestData.status as 'pending' | 'approved' | 'rejected',
-            });
           } else {
             setValidationStatus('invalid');
             setClientData(null);
@@ -159,13 +192,11 @@ const Login = () => {
   }, [loginType]);
 
   const handleLogin = async () => {
-    if (validationStatus !== 'valid') return;
+    if (validationStatus !== 'valid' || !password) return;
     
     setIsLoading(true);
 
     try {
-      // For demo purposes, we'll sign in using a predefined password
-      // In production, you'd implement magic link or password flow
       const email = loginType === "admin" ? adminData?.email : clientData?.email;
       
       if (!email) {
@@ -173,15 +204,13 @@ const Login = () => {
         return;
       }
 
-      // Try to sign in with default password (for demo)
       const { error } = await supabase.auth.signInWithPassword({
         email,
-        password: 'password123', // Demo password
+        password,
       });
 
       if (error) {
-        // If password auth fails, suggest magic link
-        toast.error("Contate o administrador para obter suas credenciais");
+        toast.error("Senha incorreta. Tente novamente.");
         return;
       }
 
@@ -193,10 +222,48 @@ const Login = () => {
     }
   };
 
+  const handleRegister = async () => {
+    if (!password || password.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+    
+    setIsLoading(true);
+
+    try {
+      const email = loginType === "admin" ? adminData?.email : clientData?.email;
+      
+      if (!email) {
+        toast.error("Email não encontrado");
+        return;
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success("Conta criada! Verifique seu email ou faça login.");
+    } catch (error) {
+      toast.error("Erro ao criar conta. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getInputBorderClass = () => {
     if (isValidating) return "border-yellow-500/50 focus:border-yellow-500";
     switch (validationStatus) {
       case 'valid': return "border-green-500/50 focus:border-green-500 bg-green-500/5";
+      case 'needs_registration': return "border-primary/50 focus:border-primary bg-primary/5";
       case 'invalid': return "border-red-500/50 focus:border-red-500 bg-red-500/5";
       case 'pending': return "border-yellow-500/50 focus:border-yellow-500 bg-yellow-500/5";
       default: return "";
@@ -290,6 +357,7 @@ const Login = () => {
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   {isValidating && <Loader2 className="w-5 h-5 animate-spin text-yellow-500" />}
                   {!isValidating && validationStatus === 'valid' && <CheckCircle className="w-5 h-5 text-green-500" />}
+                  {!isValidating && validationStatus === 'needs_registration' && <CheckCircle className="w-5 h-5 text-primary" />}
                   {!isValidating && validationStatus === 'invalid' && <XCircle className="w-5 h-5 text-red-500" />}
                   {!isValidating && validationStatus === 'pending' && <Clock className="w-5 h-5 text-yellow-500 animate-pulse" />}
                 </div>
@@ -299,7 +367,7 @@ const Login = () => {
               </p>
             </div>
 
-            {/* Admin Info Card */}
+            {/* Admin Info Card - Existing User */}
             {loginType === "admin" && validationStatus === 'valid' && adminData && (
               <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 animate-scale-in">
                 <div className="flex items-center gap-4">
@@ -322,6 +390,25 @@ const Login = () => {
               </div>
             )}
 
+            {/* Admin Info Card - Needs Registration */}
+            {loginType === "admin" && validationStatus === 'needs_registration' && adminData && (
+              <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/30 animate-scale-in">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full gradient-button flex items-center justify-center text-primary-foreground font-bold text-lg">
+                    {getInitials(adminData.full_name)}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">{adminData.full_name}</p>
+                    <p className="text-sm text-muted-foreground">{adminData.email}</p>
+                    <span className="inline-flex items-center gap-1 text-xs text-primary mt-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Cadastro Aprovado - Complete o registro
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Client Status Cards */}
             {loginType === "client" && validationStatus === 'valid' && clientData && (
               <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 animate-scale-in">
@@ -332,6 +419,19 @@ const Login = () => {
                       Status: Ativo
                     </span>
                     <p className="font-semibold">{clientData.full_name}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Client Needs Registration */}
+            {loginType === "client" && validationStatus === 'needs_registration' && clientData && (
+              <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/30 animate-scale-in">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="font-semibold text-primary">Cadastro Aprovado!</p>
+                    <p className="text-sm text-muted-foreground">Complete seu registro abaixo</p>
                   </div>
                 </div>
               </div>
@@ -363,6 +463,31 @@ const Login = () => {
               </div>
             )}
 
+            {/* Password Field - Show when valid or needs registration */}
+            {(validationStatus === 'valid' || validationStatus === 'needs_registration') && (
+              <div className="space-y-2 mb-4 animate-scale-in">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  🔐 {validationStatus === 'needs_registration' ? 'Crie sua senha' : 'Senha'}
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder={validationStatus === 'needs_registration' ? "Mínimo 6 caracteres" : "••••••••"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 pr-10 transition-all duration-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Login Button */}
             {validationStatus === 'valid' && (
               <Button 
@@ -370,7 +495,7 @@ const Login = () => {
                 variant="hero" 
                 className="w-full h-14 text-lg transition-all duration-300 hover:scale-[1.02] animate-scale-in group" 
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading || !password}
               >
                 {isLoading ? (
                   <>
@@ -380,6 +505,29 @@ const Login = () => {
                 ) : (
                   <>
                     ENTRAR
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+            )}
+
+            {/* Register Button */}
+            {validationStatus === 'needs_registration' && (
+              <Button 
+                onClick={handleRegister}
+                variant="hero" 
+                className="w-full h-14 text-lg transition-all duration-300 hover:scale-[1.02] animate-scale-in group" 
+                size="lg"
+                disabled={isLoading || password.length < 6}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Criando conta...
+                  </>
+                ) : (
+                  <>
+                    ✨ CRIAR MINHA CONTA
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
