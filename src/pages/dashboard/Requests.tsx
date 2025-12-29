@@ -106,26 +106,53 @@ const Requests = () => {
           return;
         }
 
-        // Copy data to clients table
-        const { error: insertError } = await supabase
+        // If client already exists (same email), update it instead of inserting
+        const { data: existingClient, error: existingError } = await supabase
           .from('clients')
-          .insert({
-            matricula: selectedRequest.matricula,
-            full_name: selectedRequest.full_name,
-            email: selectedRequest.email,
-            cpf: selectedRequest.cpf || '00000000000', // Placeholder if not provided
-            phone: selectedRequest.phone,
-            company_name: selectedRequest.company_name,
-            segmento: selectedRequest.segmento,
-            birth_date: selectedRequest.birth_date,
-            status: 'active',
-            is_active: true,
-            start_date: new Date().toISOString().split('T')[0],
-          });
+          .select('id, matricula')
+          .eq('email', selectedRequest.email)
+          .maybeSingle();
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw insertError;
+        if (existingError) throw existingError;
+
+        if (existingClient) {
+          const { error: updateError } = await supabase
+            .from('clients')
+            .update({
+              full_name: selectedRequest.full_name,
+              phone: selectedRequest.phone,
+              company_name: selectedRequest.company_name,
+              segmento: selectedRequest.segmento,
+              birth_date: selectedRequest.birth_date,
+              status: 'active',
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingClient.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Copy data to clients table
+          const { error: insertError } = await supabase
+            .from('clients')
+            .insert({
+              matricula: selectedRequest.matricula,
+              full_name: selectedRequest.full_name,
+              email: selectedRequest.email,
+              cpf: selectedRequest.cpf || '00000000000', // Placeholder if not provided
+              phone: selectedRequest.phone,
+              company_name: selectedRequest.company_name,
+              segmento: selectedRequest.segmento,
+              birth_date: selectedRequest.birth_date,
+              status: 'active',
+              is_active: true,
+              start_date: new Date().toISOString().split('T')[0],
+            });
+
+          if (insertError) {
+            console.error('Insert error:', insertError);
+            throw insertError;
+          }
         }
 
         // Delete from account_requests
@@ -138,13 +165,19 @@ const Requests = () => {
 
         // Log the action
         await supabase.from('system_logs').insert({
-          action: `Cliente ${selectedRequest.full_name} aprovado e movido para clientes`,
+          action: existingClient
+            ? `Solicitação aprovada: cliente ${selectedRequest.full_name} atualizado (já existia)`
+            : `Cliente ${selectedRequest.full_name} aprovado e movido para clientes`,
           user_id: user.id,
           details: { request_id: selectedRequest.id, matricula: selectedRequest.matricula },
         });
 
-        toast.success(`Cliente ${selectedRequest.full_name} aprovado com sucesso!`);
-        
+        toast.success(
+          existingClient
+            ? `Cliente ${selectedRequest.full_name} já existia — dados atualizados e solicitação removida.`
+            : `Cliente ${selectedRequest.full_name} aprovado com sucesso!`
+        );
+
         // Remove from local state
         setRequests(requests.filter(r => r.id !== selectedRequest.id));
       } else {
