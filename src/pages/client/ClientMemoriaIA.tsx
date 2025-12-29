@@ -176,7 +176,7 @@ const ClientMemoriaIA = () => {
   const memoryStatus = getMemoryStatus();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout isAdmin={false}>
       <div className="p-6 lg:p-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
