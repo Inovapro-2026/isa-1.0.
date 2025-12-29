@@ -1,0 +1,354 @@
+import { useState, useEffect, useRef } from "react";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Search, Send, User, Bot, Phone, Image, Mic,
+  MoreVertical, Star, CheckCheck, Check, Paperclip,
+  Users, Play, Pause, Brain
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+interface Contact {
+  id: string;
+  name: string;
+  phone_number: string;
+  profile_pic_url: string | null;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+  is_online: boolean;
+  is_group: boolean;
+  is_favorite: boolean;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  is_from_me: boolean;
+  is_ai_response: boolean;
+  timestamp: string;
+  status: "sent" | "delivered" | "read";
+  media_type: string | null;
+  media_url: string | null;
+}
+
+// Mock data
+const mockContacts: Contact[] = [
+  { id: "1", name: "João Silva", phone_number: "+55 11 99999-0001", profile_pic_url: null, last_message: "Olá, gostaria de saber mais...", last_message_time: "10:30", unread_count: 2, is_online: true, is_group: false, is_favorite: true },
+  { id: "2", name: "Maria Santos", phone_number: "+55 11 99999-0002", profile_pic_url: null, last_message: "Obrigada pelo atendimento!", last_message_time: "09:45", unread_count: 0, is_online: false, is_group: false, is_favorite: false },
+  { id: "3", name: "Grupo Vendas", phone_number: "", profile_pic_url: null, last_message: "Pessoal, nova promoção...", last_message_time: "Ontem", unread_count: 5, is_online: false, is_group: true, is_favorite: false },
+  { id: "4", name: "Pedro Lima", phone_number: "+55 11 99999-0003", profile_pic_url: null, last_message: "Qual o valor do produto?", last_message_time: "Ontem", unread_count: 1, is_online: true, is_group: false, is_favorite: true },
+];
+
+const mockMessages: Message[] = [
+  { id: "1", content: "Olá, bom dia!", is_from_me: false, is_ai_response: false, timestamp: "10:25", status: "read", media_type: null, media_url: null },
+  { id: "2", content: "Olá! Bem-vindo! Sou a ISA, assistente virtual. Como posso ajudar você hoje? 😊", is_from_me: true, is_ai_response: true, timestamp: "10:25", status: "read", media_type: null, media_url: null },
+  { id: "3", content: "Gostaria de saber mais sobre os serviços de vocês", is_from_me: false, is_ai_response: false, timestamp: "10:28", status: "read", media_type: null, media_url: null },
+  { id: "4", content: "Claro! Oferecemos automação de atendimento via WhatsApp com inteligência artificial. Quer que eu explique melhor?", is_from_me: true, is_ai_response: true, timestamp: "10:28", status: "read", media_type: null, media_url: null },
+  { id: "5", content: "Sim, por favor!", is_from_me: false, is_ai_response: false, timestamp: "10:30", status: "read", media_type: null, media_url: null },
+];
+
+const ClientChat = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  
+  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(mockContacts[0]);
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [newMessage, setNewMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<"all" | "unread" | "favorites">("all");
+  const [isAIActive, setIsAIActive] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !selectedContact) return;
+
+    const message: Message = {
+      id: Date.now().toString(),
+      content: newMessage,
+      is_from_me: true,
+      is_ai_response: false,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      status: "sent",
+      media_type: null,
+      media_url: null,
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage("");
+
+    if (isAIActive) {
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: "Entendi! Vou verificar isso para você. Aguarde um momento... ✅",
+          is_from_me: true,
+          is_ai_response: true,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          status: "sent",
+          media_type: null,
+          media_url: null,
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }, 1000);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "read": return <CheckCheck className="w-4 h-4 text-primary" />;
+      case "delivered": return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
+      default: return <Check className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  const filteredContacts = contacts.filter(contact => {
+    const matchesSearch = contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         contact.phone_number.includes(searchTerm);
+    const matchesFilter = filter === "all" || 
+                         (filter === "unread" && contact.unread_count > 0) ||
+                         (filter === "favorites" && contact.is_favorite);
+    return matchesSearch && matchesFilter;
+  });
+
+  return (
+    <DashboardLayout>
+      <div className="h-[calc(100vh-2rem)] flex flex-col p-4 lg:p-6 gap-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Chat</h1>
+            <p className="text-sm text-muted-foreground">Suas conversas do WhatsApp</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={isAIActive ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsAIActive(!isAIActive)}
+            >
+              {isAIActive ? <Bot className="w-4 h-4 mr-2" /> : <User className="w-4 h-4 mr-2" />}
+              {isAIActive ? "IA Ativa" : "IA Pausada"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/client/memoria-ia')}
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              Configurar IA
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+          {/* Contacts Sidebar */}
+          <Card className="glass lg:col-span-1 flex flex-col overflow-hidden">
+            <CardHeader className="p-3 border-b border-border space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar conversa..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-9"
+                />
+              </div>
+              <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="all" className="flex-1 text-xs">Todas</TabsTrigger>
+                  <TabsTrigger value="unread" className="flex-1 text-xs">Não lidas</TabsTrigger>
+                  <TabsTrigger value="favorites" className="flex-1 text-xs">
+                    <Star className="w-3 h-3" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardHeader>
+            <ScrollArea className="flex-1">
+              {filteredContacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => setSelectedContact(contact)}
+                  className={`w-full p-3 text-left border-b border-border transition-colors ${
+                    selectedContact?.id === contact.id ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        {contact.is_group ? (
+                          <Users className="w-5 h-5 text-primary" />
+                        ) : (
+                          <User className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                      {contact.is_online && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent border-2 border-background" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className={`font-medium truncate ${contact.unread_count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {contact.name}
+                        </p>
+                        <span className="text-xs text-muted-foreground">{contact.last_message_time}</span>
+                      </div>
+                      <p className={`text-sm truncate ${contact.unread_count > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                        {contact.last_message}
+                      </p>
+                    </div>
+                    {contact.unread_count > 0 && (
+                      <Badge className="bg-primary text-primary-foreground h-5 w-5 p-0 justify-center rounded-full text-xs">
+                        {contact.unread_count}
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </ScrollArea>
+          </Card>
+
+          {/* Chat Area */}
+          <Card className="glass lg:col-span-2 flex flex-col overflow-hidden">
+            {selectedContact ? (
+              <>
+                {/* Chat Header */}
+                <CardHeader className="p-3 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                        {selectedContact.is_online && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent border-2 border-background" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{selectedContact.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedContact.is_online ? "Online" : `Visto por último ${selectedContact.last_message_time}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Search className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                {/* Messages */}
+                <ScrollArea className="flex-1 p-4">
+                  <div className="space-y-4">
+                    {messages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex gap-2 ${msg.is_from_me ? "justify-end" : "justify-start"}`}
+                      >
+                        {!msg.is_from_me && (
+                          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                            <User className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                            msg.is_from_me
+                              ? msg.is_ai_response
+                                ? "gradient-button text-primary-foreground rounded-tr-sm"
+                                : "bg-primary text-primary-foreground rounded-tr-sm"
+                              : "bg-secondary text-secondary-foreground rounded-tl-sm"
+                          }`}
+                        >
+                          {msg.is_ai_response && msg.is_from_me && (
+                            <div className="flex items-center gap-1 mb-1 text-xs opacity-80">
+                              <Bot className="w-3 h-3" />
+                              <span>IA</span>
+                            </div>
+                          )}
+                          <p className="text-sm">{msg.content}</p>
+                          <div className={`flex items-center justify-end gap-1 mt-1 ${
+                            msg.is_from_me ? "text-primary-foreground/70" : "text-muted-foreground"
+                          }`}>
+                            <span className="text-xs">{msg.timestamp}</span>
+                            {msg.is_from_me && getStatusIcon(msg.status)}
+                          </div>
+                        </div>
+                        {msg.is_from_me && !msg.is_ai_response && (
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <User className="w-4 h-4 text-primary" />
+                          </div>
+                        )}
+                        {msg.is_from_me && msg.is_ai_response && (
+                          <div className="w-8 h-8 rounded-full gradient-button flex items-center justify-center shrink-0">
+                            <Bot className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+
+                {/* Message Input */}
+                <div className="p-3 border-t border-border">
+                  <div className="flex gap-2">
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-10 w-10">
+                        <Paperclip className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10">
+                        <Image className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10">
+                        <Mic className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder="Digite sua mensagem..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                      className="flex-1"
+                    />
+                    <Button variant="hero" size="icon" onClick={handleSendMessage}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Bot className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p>Selecione uma conversa para começar</p>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default ClientChat;

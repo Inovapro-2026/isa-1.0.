@@ -27,6 +27,8 @@ import Settings from "./pages/dashboard/Settings";
 // Client Dashboard Pages
 import ClientDashboard from "./pages/dashboard/ClientDashboard";
 import ClientWhatsApp from "./pages/client/ClientWhatsApp";
+import ClientMemoriaIA from "./pages/client/ClientMemoriaIA";
+import ClientChat from "./pages/client/ClientChat";
 import ClientSupport from "./pages/client/ClientSupport";
 import ClientProfile from "./pages/client/ClientProfile";
 
@@ -102,6 +104,16 @@ const App = () => (
             <Route path="/client/whatsapp" element={
               <ProtectedRoute>
                 <ClientWhatsApp />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/memoria-ia" element={
+              <ProtectedRoute>
+                <ClientMemoriaIA />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/chat" element={
+              <ProtectedRoute>
+                <ClientChat />
               </ProtectedRoute>
             } />
             <Route path="/client/support" element={
