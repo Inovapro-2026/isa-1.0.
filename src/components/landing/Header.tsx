@@ -37,7 +37,7 @@ export function Header() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link to="/cadastro">
-              <Button variant="hero">Teste Grátis</Button>
+              <Button variant="hero">Começar Agora</Button>
             </Link>
           </div>
 
@@ -68,7 +68,7 @@ export function Header() {
                   <Button variant="ghost" className="w-full">Entrar</Button>
                 </Link>
                 <Link to="/cadastro">
-                  <Button variant="hero" className="w-full">Teste Grátis</Button>
+                  <Button variant="hero" className="w-full">Começar Agora</Button>
                 </Link>
               </div>
             </nav>
