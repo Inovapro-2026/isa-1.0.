@@ -8,7 +8,8 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Users
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const adminMenuItems = [
   { icon: Bot, label: "WhatsApp Bot", path: "/whatsapp-bot" },
   { icon: MessageSquare, label: "Minhas Conversas", path: "/conversations" },
   { icon: FileText, label: "Solicitações", path: "/requests" },
+  { icon: Users, label: "Clientes", path: "/clients" },
   { icon: HeadphonesIcon, label: "Suporte", path: "/support" },
   { icon: BarChart3, label: "Relatórios", path: "/reports" },
   { icon: Settings, label: "Configurações", path: "/settings" },

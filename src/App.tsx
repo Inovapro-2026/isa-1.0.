@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
+import AguardandoAprovacao from "./pages/AguardandoAprovacao";
 import NotFound from "./pages/NotFound";
 
 // Admin Dashboard Pages
@@ -17,6 +18,7 @@ import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import WhatsAppBot from "./pages/dashboard/WhatsAppBot";
 import Conversations from "./pages/dashboard/Conversations";
 import Requests from "./pages/dashboard/Requests";
+import Clients from "./pages/dashboard/Clients";
 import Support from "./pages/dashboard/Support";
 import Reports from "./pages/dashboard/Reports";
 import Settings from "./pages/dashboard/Settings";
@@ -41,6 +43,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/aguardando-aprovacao" element={<AguardandoAprovacao />} />
 
             {/* Admin Routes */}
             <Route path="/dashboard/admin" element={
@@ -61,6 +64,11 @@ const App = () => (
             <Route path="/requests" element={
               <ProtectedRoute requireAdmin>
                 <Requests />
+              </ProtectedRoute>
+            } />
+            <Route path="/clients" element={
+              <ProtectedRoute requireAdmin>
+                <Clients />
               </ProtectedRoute>
             } />
             <Route path="/support" element={

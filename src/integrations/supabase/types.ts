@@ -29,6 +29,7 @@ export type Database = {
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          segmento: string | null
           status: Database["public"]["Enums"]["request_status"] | null
         }
         Insert: {
@@ -45,6 +46,7 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          segmento?: string | null
           status?: Database["public"]["Enums"]["request_status"] | null
         }
         Update: {
@@ -61,6 +63,7 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          segmento?: string | null
           status?: Database["public"]["Enums"]["request_status"] | null
         }
         Relationships: []
@@ -193,6 +196,7 @@ export type Database = {
           company_name: string | null
           cpf: string
           created_at: string | null
+          data_ultima_renovacao: string | null
           email: string
           expiration_date: string | null
           full_name: string
@@ -203,6 +207,7 @@ export type Database = {
           observations: string | null
           phone: string | null
           plan: string | null
+          segmento: string | null
           start_date: string | null
           status: string | null
           trial_days: number | null
@@ -214,6 +219,7 @@ export type Database = {
           company_name?: string | null
           cpf: string
           created_at?: string | null
+          data_ultima_renovacao?: string | null
           email: string
           expiration_date?: string | null
           full_name: string
@@ -224,6 +230,7 @@ export type Database = {
           observations?: string | null
           phone?: string | null
           plan?: string | null
+          segmento?: string | null
           start_date?: string | null
           status?: string | null
           trial_days?: number | null
@@ -235,6 +242,7 @@ export type Database = {
           company_name?: string | null
           cpf?: string
           created_at?: string | null
+          data_ultima_renovacao?: string | null
           email?: string
           expiration_date?: string | null
           full_name?: string
@@ -245,6 +253,7 @@ export type Database = {
           observations?: string | null
           phone?: string | null
           plan?: string | null
+          segmento?: string | null
           start_date?: string | null
           status?: string | null
           trial_days?: number | null
