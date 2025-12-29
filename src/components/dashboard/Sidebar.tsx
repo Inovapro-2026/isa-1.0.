@@ -22,8 +22,9 @@ interface SidebarProps {
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard/admin" },
-  { icon: Bot, label: "WhatsApp Bot", path: "/whatsapp-bot" },
-  { icon: MessageSquare, label: "Minhas Conversas", path: "/conversations" },
+  { icon: Bot, label: "Meu WhatsApp", path: "/whatsapp-bot" },
+  { icon: MessageSquare, label: "Memória de IA", path: "/memoria-ia" },
+  { icon: MessageSquare, label: "Chat", path: "/chat" },
   { icon: FileText, label: "Solicitações", path: "/requests" },
   { icon: Users, label: "Clientes", path: "/clients" },
   { icon: HeadphonesIcon, label: "Suporte", path: "/support" },
