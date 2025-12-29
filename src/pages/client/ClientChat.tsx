@@ -124,7 +124,7 @@ const ClientChat = () => {
   });
 
   return (
-    <DashboardLayout>
+    <DashboardLayout isAdmin={false}>
       <div className="h-[calc(100vh-2rem)] flex flex-col p-4 lg:p-6 gap-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
