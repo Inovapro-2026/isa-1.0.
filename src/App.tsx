@@ -97,32 +97,32 @@ const App = () => (
 
             {/* Client Routes */}
             <Route path="/dashboard/client" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientDashboard />
               </ProtectedRoute>
             } />
             <Route path="/client/whatsapp" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientWhatsApp />
               </ProtectedRoute>
             } />
             <Route path="/client/memoria-ia" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientMemoriaIA />
               </ProtectedRoute>
             } />
             <Route path="/client/chat" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientChat />
               </ProtectedRoute>
             } />
             <Route path="/client/support" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientSupport />
               </ProtectedRoute>
             } />
             <Route path="/client/profile" element={
-              <ProtectedRoute>
+              <ProtectedRoute clientOnly>
                 <ClientProfile />
               </ProtectedRoute>
             } />
