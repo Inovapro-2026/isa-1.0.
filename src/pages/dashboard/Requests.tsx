@@ -26,6 +26,8 @@ interface AccountRequest {
   created_at: string | null;
   status: 'pending' | 'approved' | 'rejected' | null;
   rejection_reason: string | null;
+  segmento: string | null;
+  birth_date: string | null;
 }
 
 const Requests = () => {
@@ -38,7 +40,7 @@ const Requests = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'pending'>('pending');
   const { user } = useAuth();
 
   useEffect(() => {
@@ -67,11 +69,8 @@ const Requests = () => {
   };
 
   const filterRequests = () => {
-    let filtered = requests;
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(r => r.status === statusFilter);
-    }
+    // Always filter to pending only (approved/rejected are deleted)
+    let filtered = requests.filter(r => r.status === 'pending');
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -99,44 +98,70 @@ const Requests = () => {
     setIsProcessing(true);
 
     try {
-      const updateData: Record<string, unknown> = {
-        status: actionType === 'approve' ? 'approved' : 'rejected',
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: user.id,
-      };
+      if (actionType === 'approve') {
+        // Copy data to clients table
+        const { error: insertError } = await supabase
+          .from('clients')
+          .insert({
+            matricula: selectedRequest.matricula || '',
+            full_name: selectedRequest.full_name,
+            email: selectedRequest.email,
+            cpf: selectedRequest.cpf || '',
+            phone: selectedRequest.phone,
+            company_name: selectedRequest.company_name,
+            segmento: selectedRequest.segmento,
+            birth_date: selectedRequest.birth_date,
+            status: 'active',
+            is_active: true,
+            start_date: new Date().toISOString().split('T')[0],
+          });
 
-      if (actionType === 'reject' && rejectionReason) {
-        updateData.rejection_reason = rejectionReason;
+        if (insertError) throw insertError;
+
+        // Delete from account_requests
+        const { error: deleteError } = await supabase
+          .from('account_requests')
+          .delete()
+          .eq('id', selectedRequest.id);
+
+        if (deleteError) throw deleteError;
+
+        // Log the action
+        await supabase.from('system_logs').insert({
+          action: `Cliente ${selectedRequest.full_name} aprovado e movido para clientes`,
+          user_id: user.id,
+          details: { request_id: selectedRequest.id, matricula: selectedRequest.matricula },
+        });
+
+        toast.success(`Cliente ${selectedRequest.full_name} aprovado com sucesso!`);
+        
+        // Remove from local state
+        setRequests(requests.filter(r => r.id !== selectedRequest.id));
+      } else {
+        // Reject: just delete from account_requests
+        const { error: deleteError } = await supabase
+          .from('account_requests')
+          .delete()
+          .eq('id', selectedRequest.id);
+
+        if (deleteError) throw deleteError;
+
+        // Log the action
+        await supabase.from('system_logs').insert({
+          action: `Solicitação de ${selectedRequest.full_name} reprovada e removida`,
+          user_id: user.id,
+          details: { 
+            request_id: selectedRequest.id, 
+            matricula: selectedRequest.matricula,
+            rejection_reason: rejectionReason 
+          },
+        });
+
+        toast.success(`Solicitação de ${selectedRequest.full_name} reprovada.`);
+        
+        // Remove from local state
+        setRequests(requests.filter(r => r.id !== selectedRequest.id));
       }
-
-      const { error } = await supabase
-        .from('account_requests')
-        .update(updateData)
-        .eq('id', selectedRequest.id);
-
-      if (error) throw error;
-
-      // Log the action
-      await supabase.from('system_logs').insert({
-        action: actionType === 'approve' 
-          ? `Cliente ${selectedRequest.full_name} aprovado`
-          : `Solicitação de ${selectedRequest.full_name} reprovada`,
-        user_id: user.id,
-        details: { request_id: selectedRequest.id, matricula: selectedRequest.matricula },
-      });
-
-      toast.success(
-        actionType === 'approve'
-          ? `Solicitação de ${selectedRequest.full_name} aprovada!`
-          : `Solicitação de ${selectedRequest.full_name} reprovada.`
-      );
-
-      // Update local state
-      setRequests(requests.map(r =>
-        r.id === selectedRequest.id
-          ? { ...r, status: actionType === 'approve' ? 'approved' : 'rejected' }
-          : r
-      ));
 
       setDialogOpen(false);
     } catch (error) {
@@ -179,27 +204,11 @@ const Requests = () => {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, email, matrícula ou CPF..."
+              placeholder="Buscar por nome, email, matrícula..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
-          </div>
-          <div className="flex gap-2">
-            {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
-              <Button
-                key={status}
-                variant={statusFilter === status ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setStatusFilter(status)}
-                className="transition-all duration-200"
-              >
-                {status === 'all' && 'Todos'}
-                {status === 'pending' && 'Pendentes'}
-                {status === 'approved' && 'Aprovados'}
-                {status === 'rejected' && 'Reprovados'}
-              </Button>
-            ))}
           </div>
         </div>
 
@@ -230,10 +239,10 @@ const Requests = () => {
                       <TableHead>Matrícula</TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>CPF</TableHead>
+                      <TableHead>WhatsApp</TableHead>
                       <TableHead>Empresa</TableHead>
+                      <TableHead>Segmento</TableHead>
                       <TableHead>Data</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -252,22 +261,10 @@ const Requests = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{request.email}</TableCell>
-                        <TableCell className="font-mono text-sm">{formatCPF(request.cpf)}</TableCell>
+                        <TableCell className="font-mono text-sm">{request.phone || "—"}</TableCell>
                         <TableCell>{request.company_name || "—"}</TableCell>
+                        <TableCell>{request.segmento || "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{formatDate(request.created_at)}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              request.status === "pending" ? "outline" : 
-                              request.status === "approved" ? "default" : "destructive"
-                            }
-                            className={request.status === "approved" ? "bg-accent text-accent-foreground" : ""}
-                          >
-                            {request.status === "pending" && "Pendente"}
-                            {request.status === "approved" && "Aprovado"}
-                            {request.status === "rejected" && "Reprovado"}
-                          </Badge>
-                        </TableCell>
                         <TableCell className="text-right">
                           {request.status === "pending" && (
                             <div className="flex gap-2 justify-end">
