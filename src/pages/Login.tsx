@@ -199,13 +199,40 @@ const Login = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password: cpfPassword,
-        });
+        const trySignIn = async () => {
+          return supabase.auth.signInWithPassword({
+            email,
+            password: cpfPassword,
+          });
+        };
+
+        let { error } = await trySignIn();
+
+        // If user doesn't exist yet in Supabase Auth, create it on first login
+        if (error?.message?.toLowerCase().includes('invalid login credentials')) {
+          const redirectUrl = `${window.location.origin}/login`;
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password: cpfPassword,
+            options: {
+              emailRedirectTo: redirectUrl,
+              data: {
+                full_name: adminData?.full_name,
+              },
+            },
+          });
+
+          // ignore "already registered" and try login again
+          if (signUpError && !signUpError.message?.toLowerCase().includes('already registered')) {
+            toast.error("Administrador não cadastrado no sistema de login.");
+            return;
+          }
+
+          ({ error } = await trySignIn());
+        }
 
         if (error) {
-          toast.error("Erro ao entrar. Contate o suporte.");
+          toast.error("Erro ao entrar. Verifique seus dados ou contate o suporte.");
           return;
         }
 
@@ -248,13 +275,40 @@ const Login = () => {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: cpfPassword,
-      });
+      const trySignIn = async () => {
+        return supabase.auth.signInWithPassword({
+          email,
+          password: cpfPassword,
+        });
+      };
+
+      let { error } = await trySignIn();
+
+      // If user doesn't exist yet in Supabase Auth, create it on first login
+      if (error?.message?.toLowerCase().includes('invalid login credentials')) {
+        const redirectUrl = `${window.location.origin}/login`;
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password: cpfPassword,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              full_name: clientData?.full_name,
+            },
+          },
+        });
+
+        if (signUpError && !signUpError.message?.toLowerCase().includes('already registered')) {
+          toast.error("Cliente não cadastrado no sistema de login. Contate o suporte.");
+          setIsLoading(false);
+          return;
+        }
+
+        ({ error } = await trySignIn());
+      }
 
       if (error) {
-        toast.error("Erro ao entrar. Entre em contato com o suporte.");
+        toast.error("Erro ao entrar. Verifique seus dados ou contate o suporte.");
         setIsLoading(false);
         return;
       }
