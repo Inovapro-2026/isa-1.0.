@@ -1,1 +1,7 @@
 project_id = "mcmkzimvkomfytfaybpz"
+
+[functions.provision-user]
+verify_jwt = false
+
+[functions.isa-chat]
+verify_jwt = false
