@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, CheckCircle, Clock, Loader2, ArrowRight, ArrowLeft, User, Building2, FileCheck, Phone, Mail, Calendar } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3;
 
 const Cadastro = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
   const [formData, setFormData] = useState({
     nome: "",
@@ -79,6 +80,7 @@ const Cadastro = () => {
           phone: formData.telefone.replace(/\D/g, ''),
           company_name: formData.empresa || null,
           birth_date: formData.dataNascimento || null,
+          segmento: formData.segmento || null,
           message: formData.segmento ? `Segmento: ${formData.segmento}` : null,
           status: 'pending',
         })
@@ -95,9 +97,9 @@ const Cadastro = () => {
         return;
       }
 
-      setGeneratedMatricula(data.matricula);
-      setSubmitted(true);
       toast.success("Cadastro realizado com sucesso!");
+      // Redirect to waiting page with matricula
+      navigate(`/aguardando-aprovacao?matricula=${data.matricula}`);
     } catch (error) {
       toast.error("Erro ao enviar solicitação");
       console.error('Error:', error);
