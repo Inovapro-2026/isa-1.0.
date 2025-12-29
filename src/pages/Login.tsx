@@ -224,6 +224,32 @@ const Login = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    const email = loginType === "admin" ? adminData?.email : clientData?.email;
+    
+    if (!email) {
+      toast.error("Digite sua matrícula primeiro");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success(`Email de recuperação enviado para ${email}`);
+    } catch (error) {
+      toast.error("Erro ao enviar email de recuperação");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getInputBorderClass = () => {
     if (isValidating) return "border-yellow-500/50 focus:border-yellow-500";
@@ -460,12 +486,18 @@ const Login = () => {
             )}
 
             {/* Recovery link */}
-            <div className="mt-4 text-center">
-              <button className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
-                <Settings className="w-3 h-3" />
-                Esqueceu sua matrícula?
-              </button>
-            </div>
+            {validationStatus === 'valid' && (
+              <div className="mt-4 text-center">
+                <button 
+                  onClick={handleResetPassword}
+                  disabled={isLoading}
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+                >
+                  <Settings className="w-3 h-3" />
+                  Esqueceu sua senha? Recuperar
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
