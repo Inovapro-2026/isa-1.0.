@@ -15,8 +15,9 @@ import NotFound from "./pages/NotFound";
 
 // Admin Dashboard Pages
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
-import WhatsAppBot from "./pages/dashboard/WhatsAppBot";
-import Conversations from "./pages/dashboard/Conversations";
+import MeuWhatsApp from "./pages/dashboard/MeuWhatsApp";
+import MemoriaIA from "./pages/dashboard/MemoriaIA";
+import Chat from "./pages/dashboard/Chat";
 import Requests from "./pages/dashboard/Requests";
 import Clients from "./pages/dashboard/Clients";
 import Support from "./pages/dashboard/Support";
@@ -53,12 +54,17 @@ const App = () => (
             } />
             <Route path="/whatsapp-bot" element={
               <ProtectedRoute requireAdmin>
-                <WhatsAppBot />
+                <MeuWhatsApp />
               </ProtectedRoute>
             } />
-            <Route path="/conversations" element={
+            <Route path="/memoria-ia" element={
               <ProtectedRoute requireAdmin>
-                <Conversations />
+                <MemoriaIA />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat" element={
+              <ProtectedRoute requireAdmin>
+                <Chat />
               </ProtectedRoute>
             } />
             <Route path="/requests" element={
