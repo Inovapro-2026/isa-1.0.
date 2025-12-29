@@ -6,9 +6,10 @@ import { Loader2 } from 'lucide-react';
 interface ProtectedRouteProps {
   children: ReactNode;
   requireAdmin?: boolean;
+  clientOnly?: boolean;
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireAdmin = false, clientOnly = false }: ProtectedRouteProps) {
   const { user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
 
@@ -27,8 +28,19 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Admin trying to access client-only routes
+  if (clientOnly && isAdmin) {
+    return <Navigate to="/dashboard/admin" replace />;
+  }
+
+  // Client trying to access admin routes
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/dashboard/client" replace />;
+  }
+
+  // Non-admin trying to access admin routes (extra check)
+  if (!clientOnly && !requireAdmin && isAdmin) {
+    // Admin accessing general protected routes - allow but might want to redirect
   }
 
   return <>{children}</>;
