@@ -2,7 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Pages
 import Index from "./pages/Index";
@@ -30,34 +32,80 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/cadastro" element={<Cadastro />} />
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/cadastro" element={<Cadastro />} />
 
-          {/* Admin Routes */}
-          <Route path="/dashboard/admin" element={<AdminDashboard />} />
-          <Route path="/whatsapp-bot" element={<WhatsAppBot />} />
-          <Route path="/conversations" element={<Conversations />} />
-          <Route path="/requests" element={<Requests />} />
-          <Route path="/support" element={<Support />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
+            {/* Admin Routes */}
+            <Route path="/dashboard/admin" element={
+              <ProtectedRoute requireAdmin>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/whatsapp-bot" element={
+              <ProtectedRoute requireAdmin>
+                <WhatsAppBot />
+              </ProtectedRoute>
+            } />
+            <Route path="/conversations" element={
+              <ProtectedRoute requireAdmin>
+                <Conversations />
+              </ProtectedRoute>
+            } />
+            <Route path="/requests" element={
+              <ProtectedRoute requireAdmin>
+                <Requests />
+              </ProtectedRoute>
+            } />
+            <Route path="/support" element={
+              <ProtectedRoute requireAdmin>
+                <Support />
+              </ProtectedRoute>
+            } />
+            <Route path="/reports" element={
+              <ProtectedRoute requireAdmin>
+                <Reports />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute requireAdmin>
+                <Settings />
+              </ProtectedRoute>
+            } />
 
-          {/* Client Routes */}
-          <Route path="/dashboard/client" element={<ClientDashboard />} />
-          <Route path="/client/whatsapp" element={<ClientWhatsApp />} />
-          <Route path="/client/support" element={<ClientSupport />} />
-          <Route path="/client/profile" element={<ClientProfile />} />
+            {/* Client Routes */}
+            <Route path="/dashboard/client" element={
+              <ProtectedRoute>
+                <ClientDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/whatsapp" element={
+              <ProtectedRoute>
+                <ClientWhatsApp />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/support" element={
+              <ProtectedRoute>
+                <ClientSupport />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/profile" element={
+              <ProtectedRoute>
+                <ClientProfile />
+              </ProtectedRoute>
+            } />
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+            {/* 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
